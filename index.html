@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaCommerce: Smart Water Monitoring Visualization</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; }
+        
+        /* Full Screen Canvas */
+        #canvas-container { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block; 
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        
+        /* Dashboard Overlay - Compact HUD style */
+        #dashboard-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 1200px;
+            height: auto;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 30px;
+            box-sizing: border-box;
+            z-index: 10;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        /* Branding */
+        .header-section { 
+            display: flex; 
+            flex-direction: column; 
+            min-width: 150px;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding-right: 20px;
+            margin-right: 20px;
+        }
+
+        h1 { font-size: 18px; margin: 0 0 4px 0; color: #38bdf8; display: flex; align-items: center; gap: 8px; font-weight: 700; }
+        h2 { font-size: 11px; margin: 0; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Metrics Row */
+        .metrics-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .metric-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 15px;
+        }
+
+        .metric-value { font-size: 24px; font-weight: 700; color: white; line-height: 1.2; }
+        .metric-label { font-size: 11px; color: #94a3b8; font-weight: 500; }
+
+        /* Controls */
+        .controls-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            margin-left: 20px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            white-space: nowrap;
+        }
+
+        .status-badge.alert { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+
+        button {
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        button:hover { background: #7dd3fc; transform: translateY(-1px); }
+        button.active { background: #ef4444; color: white; }
+
+        /* Floating Legend - Top Left */
+        .legend {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: rgba(15, 23, 42, 0.8);
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #cbd5e1;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 5;
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+        .legend-item:last-child { margin-bottom: 0; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #38bdf8;
+            animation: pulse 1.5s infinite;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+    <!-- Import Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading" class="loading">Initializing Facility Model...</div>
+
+    <!-- 3D Canvas Area -->
+    <div id="canvas-container">
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background: #38bdf8; color: #38bdf8;"></div> Processing Lines</div>
+            <div class="legend-item"><div class="dot" style="background: #fb923c; color: #fb923c;"></div> AquaSense Nodes</div>
+            <div class="legend-item"><div class="dot" style="background: #ef4444; color: #ef4444;"></div> Alert/Leak Zones</div>
+            <div class="legend-item"><div class="dot" style="background: #64748b; color: #64748b;"></div> Storage Tanks</div>
+        </div>
+    </div>
+
+    <!-- Floating HUD Dashboard -->
+    <div id="dashboard-container">
+        <div class="header-section">
+            <h1>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                </svg>
+                AquaCommerce
+            </h1>
+            <h2>Sector 7 Distribution</h2>
+        </div>
+        
+        <div class="metrics-section">
+            <div class="metric-card">
+                <div class="metric-value" id="total-flow">0</div>
+                <div class="metric-label">Net Flow (L/min)</div>
+            </div>
+            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div class="metric-card">
+                <div class="metric-value" id="system-pressure">0</div>
+                <div class="metric-label">Avg Pressure (PSI)</div>
+            </div>
+            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div class="metric-card">
+                <div class="metric-value" id="efficiency-score">98%</div>
+                <div class="metric-label">Efficiency</div>
+            </div>
+            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div class="metric-card">
+                <div class="metric-value" id="savings-est">$4.2k</div>
+                <div class="metric-label">Mo. Savings</div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div id="system-status" class="status-badge">SYSTEM OPTIMAL</div>
+            <button id="toggle-leak">⚠️ Simulate Leak</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- Configuration ---
+        const CONFIG = {
+            pipeColor: 0x1e293b,
+            tankColor: 0x334155,
+            sensorColor: 0xfb923c,
+            alertColor: 0xef4444,
+            floorColor: 0x0f172a,
+            gridColor: 0x1e293b
+        };
+
+        let scene, camera, renderer, controls, composer;
+        let sensors = [];
+        let pipes = [];
+        let particles = [];
+        let isLeakActive = false;
+        
+        // DOM Elements
+        const elTotalFlow = document.getElementById('total-flow');
+        const elPressure = document.getElementById('system-pressure');
+        const elStatus = document.getElementById('system-status');
+        const elEfficiency = document.getElementById('efficiency-score');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        init();
+        animate();
+
+        function init() {
+            document.getElementById('loading').style.display = 'none';
+
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020617);
+            scene.fog = new THREE.FogExp2(0x020617, 0.012);
+
+            // Camera - Positioned higher and angled down to avoid dashboard overlap
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 60, 60); 
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            canvasContainer.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2.1; 
+            controls.minDistance = 30;
+            controls.maxDistance = 150;
+            // Shift target slightly up so model is centered in the "viewable" area above dashboard
+            controls.target.set(0, 5, 0); 
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(-30, 80, 40);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.left = -60;
+            dirLight.shadow.camera.right = 60;
+            dirLight.shadow.camera.top = 60;
+            dirLight.shadow.camera.bottom = -60;
+            scene.add(dirLight);
+
+            // Post-Processing
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0;
+            bloomPass.strength = 0.3;
+            bloomPass.radius = 0;
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // Environment & Facility Generation
+            createEnvironment();
+            createFullFacility();
+            
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.getElementById('toggle-leak').addEventListener('click', toggleLeak);
+        }
+
+        function createEnvironment() {
+            // Floor Grid
+            const gridHelper = new THREE.GridHelper(200, 100, CONFIG.alertColor, CONFIG.gridColor);
+            gridHelper.position.y = -0.01;
+            gridHelper.material.opacity = 0.1;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+
+            // Warehouse Floor
+            const planeGeometry = new THREE.PlaneGeometry(300, 300);
+            const planeMaterial = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.floorColor, 
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = -Math.PI / 2;
+            plane.receiveShadow = true;
+            scene.add(plane);
+        }
+
+        // Helper to draw a single pipe segment
+        function addPipe(start, end, diameter = 0.6) {
+            const material = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.pipeColor, 
+                roughness: 0.3,
+                metalness: 0.8
+            });
+            
+            const distance = start.distanceTo(end);
+            const geometry = new THREE.CylinderGeometry(diameter, diameter, distance, 12);
+            geometry.translate(0, distance / 2, 0);
+            geometry.rotateX(Math.PI / 2);
+            
+            const pipe = new THREE.Mesh(geometry, material);
+            pipe.position.copy(start);
+            pipe.lookAt(end);
+            pipe.castShadow = true;
+            pipe.receiveShadow = true;
+            
+            pipes.push(pipe); 
+            scene.add(pipe);
+
+            // Joints
+            const jointGeo = new THREE.SphereGeometry(diameter * 1.3, 12, 12);
+            const joint = new THREE.Mesh(jointGeo, material);
+            joint.position.copy(start);
+            scene.add(joint);
+            
+            const jointEnd = new THREE.Mesh(jointGeo, material);
+            jointEnd.position.copy(end);
+            scene.add(jointEnd);
+
+            return pipe;
+        }
+
+        function createTank(position, height, radius, labelText) {
+            const geo = new THREE.CylinderGeometry(radius, radius, height, 32);
+            const mat = new THREE.MeshStandardMaterial({ color: CONFIG.tankColor, roughness: 0.4, metalness: 0.6 });
+            const tank = new THREE.Mesh(geo, mat);
+            tank.position.copy(position);
+            tank.position.y = height / 2;
+            tank.castShadow = true;
+            tank.receiveShadow = true;
+            scene.add(tank);
+
+            // Label
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512; canvas.height = 128;
+            
+            // Clean text rendering
+            ctx.font = "bold 40px 'Segoe UI', Arial"; 
+            ctx.fillStyle = "#38bdf8"; 
+            ctx.textAlign = "center";
+            ctx.shadowColor="black";
+            ctx.shadowBlur=10;
+            ctx.fillText(labelText, 256, 80);
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.position.copy(position);
+            sprite.position.y = height + 4;
+            sprite.scale.set(12, 3, 1);
+            scene.add(sprite);
+        }
+
+        function createFullFacility() {
+            // 1. INLET TANK (Left Side)
+            const inletPos = new THREE.Vector3(-45, 0, 0);
+            createTank(inletPos, 10, 5, "MAIN INLET");
+
+            // 2. MAIN FEED
+            const feedStart = new THREE.Vector3(-45, 2, 0);
+            const feedEnd = new THREE.Vector3(-25, 2, 0);
+            addPipe(feedStart, feedEnd, 0.8);
+            createFlowParticles(feedStart, feedEnd);
+            createSensor(new THREE.Vector3(-35, 2, 0), "MAIN-01"); 
+
+            // 3. DISTRIBUTION MANIFOLD
+            const manifoldTop = new THREE.Vector3(-25, 2, -18);
+            const manifoldBot = new THREE.Vector3(-25, 2, 18);
+            addPipe(manifoldTop, manifoldBot, 1.0);
+
+            // 4. PROCESSING LINES (3 Parallel Lines)
+            const zPositions = [-18, 0, 18];
+            const lineNames = ["LN-A", "LN-B", "LN-C"];
+
+            zPositions.forEach((z, index) => {
+                const start = new THREE.Vector3(-25, 2, z);
+                const mid1 = new THREE.Vector3(-10, 2, z); 
+                const mid2 = new THREE.Vector3(10, 2, z);  
+                const end = new THREE.Vector3(25, 2, z);
+
+                addPipe(start, end, 0.6);
+                createFlowParticles(start, end);
+
+                // Processing Unit
+                const machineGeo = new THREE.BoxGeometry(6, 4, 4);
+                const machineMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.2, metalness: 0.8 });
+                const machine = new THREE.Mesh(machineGeo, machineMat);
+                machine.position.set(0, 2, z);
+                machine.castShadow = true;
+                scene.add(machine);
+
+                // Sensor after machine
+                createSensor(new THREE.Vector3(15, 2, z), `${lineNames[index]}-S`);
+            });
+
+            // 5. COLLECTION MANIFOLD
+            const colTop = new THREE.Vector3(25, 2, -18);
+            const colBot = new THREE.Vector3(25, 2, 18);
+            addPipe(colTop, colBot, 1.0);
+
+            // 6. OUTLET FEED
+            const outStart = new THREE.Vector3(25, 2, 0);
+            const outEnd = new THREE.Vector3(45, 2, 0);
+            addPipe(outStart, outEnd, 0.8);
+            createFlowParticles(outStart, outEnd);
+            createSensor(new THREE.Vector3(35, 2, 0), "OUT-FINAL");
+
+            // 7. OUTLET TANK (Right Side)
+            const outletPos = new THREE.Vector3(45, 0, 0);
+            createTank(outletPos, 10, 5, "FILTRATION OUT");
+        }
+
+        function createSensor(position, label) {
+            const group = new THREE.Group();
+            group.position.copy(position);
+
+            // Sensor Body
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 0.8, 0.8),
+                new THREE.MeshStandardMaterial({ color: CONFIG.sensorColor, roughness: 0.4 })
+            );
+            body.position.y = 1;
+            body.castShadow = true;
+            group.add(body);
+
+            // Status Light
+            const statusLight = new THREE.Mesh(
+                new THREE.SphereGeometry(0.25),
+                new THREE.MeshBasicMaterial({ color: 0x22c55e })
+            );
+            statusLight.position.set(0, 1.5, 0);
+            group.add(statusLight);
+            
+            // Point light for status glow
+            const glow = new THREE.PointLight(0x22c55e, 1, 4);
+            glow.position.set(0, 2, 0);
+            group.add(glow);
+
+            // 3D Floating Label
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 256; canvas.height = 128;
+            
+            // Initial Draw
+            ctx.fillStyle = "rgba(0,0,0,0.6)"; 
+            ctx.strokeStyle = "#38bdf8"; 
+            ctx.lineWidth=2;
+            
+            // Helper to draw rounded rect
+            function roundRect(ctx, x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                ctx.beginPath();
+                ctx.moveTo(x+r, y);
+                ctx.arcTo(x+w, y,   x+w, y+h, r);
+                ctx.arcTo(x+w, y+h, x,   y+h, r);
+                ctx.arcTo(x,   y+h, x,   y,   r);
+                ctx.arcTo(x,   y,   x+w, y,   r);
+                ctx.closePath();
+            }
+
+            roundRect(ctx, 5, 5, 246, 118, 10);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.font = "bold 24px Arial"; ctx.fillStyle = "white"; ctx.textAlign = "center";
+            ctx.fillText(label, 128, 40);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+            sprite.position.y = 4;
+            sprite.scale.set(3, 1.5, 1);
+            group.add(sprite);
+
+            // Data Logic
+            group.userData = {
+                id: label,
+                baseFlow: 120 + Math.random() * 20,
+                basePressure: 80 + Math.random() * 5,
+                statusLight: statusLight,
+                glow: glow,
+                ctx: ctx,
+                texture: texture,
+                sprite: sprite
+            };
+
+            sensors.push(group);
+            scene.add(group);
+        }
+
+        function createFlowParticles(start, end) {
+            const count = 40;
+            const particleGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+            const speeds = [];
+
+            for(let i=0; i<count; i++) {
+                const alpha = Math.random();
+                const pos = new THREE.Vector3().lerpVectors(start, end, alpha);
+                positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
+                speeds.push(0.05 + Math.random() * 0.15);
+            }
+
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const particleMat = new THREE.PointsMaterial({
+                color: 0x38bdf8, size: 0.25, transparent: true, opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            const points = new THREE.Points(particleGeo, particleMat);
+            points.userData = { start, end, speeds };
+            particles.push(points);
+            scene.add(points);
+        }
+
+        function toggleLeak() {
+            isLeakActive = !isLeakActive;
+            const btn = document.getElementById('toggle-leak');
+            
+            if (isLeakActive) {
+                btn.classList.add('active');
+                btn.innerHTML = "Fix Leak";
+                elStatus.innerHTML = "CRITICAL ALERT";
+                elStatus.className = "status-badge alert";
+                elEfficiency.innerText = "64%";
+                elEfficiency.style.color = "#f87171";
+
+                const targetSensor = sensors[2]; // Middle Line B
+                
+                targetSensor.userData.statusLight.material.color.setHex(CONFIG.alertColor);
+                targetSensor.userData.glow.color.setHex(CONFIG.alertColor);
+                targetSensor.userData.sprite.material.color.setHex(0xffaaaa);
+                
+                // Highlight Pipe
+                if(pipes[3]) pipes[3].material = new THREE.MeshStandardMaterial({
+                    color: 0xef4444, roughness: 0.3, emissive: 0x550000
+                });
+
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = "⚠️ Simulate Leak";
+                elStatus.innerHTML = "SYSTEM OPTIMAL";
+                elStatus.className = "status-badge";
+                elEfficiency.innerText = "98%";
+                elEfficiency.style.color = "white";
+
+                sensors.forEach(s => {
+                    s.userData.statusLight.material.color.setHex(0x22c55e);
+                    s.userData.glow.color.setHex(0x22c55e);
+                    s.userData.sprite.material.color.setHex(0xffffff);
+                });
+
+                const defMat = new THREE.MeshStandardMaterial({ color: CONFIG.pipeColor, roughness: 0.3, metalness: 0.8 });
+                pipes.forEach(p => p.material = defMat);
+            }
+        }
+
+        function updateData() {
+            let totalFlow = 0;
+            let totalPressure = 0;
+
+            sensors.forEach(sensor => {
+                const data = sensor.userData;
+                let flow = data.baseFlow + (Math.random() - 0.5) * 5;
+                let press = data.basePressure + (Math.random() - 0.5) * 2;
+
+                if (isLeakActive && data.id === "LN-B-S") {
+                    press -= 35; 
+                    flow += 40; 
+                }
+
+                totalFlow += flow;
+                totalPressure += press;
+
+                // Update 3D Label
+                const ctx = data.ctx;
+                
+                // Red background if alert
+                if (isLeakActive && data.id === "LN-B-S") {
+                    ctx.fillStyle = "rgba(220, 20, 20, 0.85)";
+                    ctx.strokeStyle = "#ffaaaa";
+                } else {
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+                    ctx.strokeStyle = "#38bdf8";
+                }
+                
+                ctx.clearRect(0,0,256,128);
+                
+                // Draw Box
+                function roundRect(ctx, x, y, w, h, r) {
+                    if (w < 2 * r) r = w / 2;
+                    if (h < 2 * r) r = h / 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x+r, y);
+                    ctx.arcTo(x+w, y,   x+w, y+h, r);
+                    ctx.arcTo(x+w, y+h, x,   y+h, r);
+                    ctx.arcTo(x,   y+h, x,   y,   r);
+                    ctx.arcTo(x,   y,   x+w, y,   r);
+                    ctx.closePath();
+                }
+                
+                roundRect(ctx, 4, 4, 248, 120, 10);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.font = "bold 24px Arial"; ctx.fillStyle = "white"; ctx.textAlign = "center";
+                ctx.fillText(data.id, 128, 35);
+                
+                ctx.font = "24px monospace"; ctx.fillStyle = "#38bdf8";
+                ctx.fillText(`${flow.toFixed(1)} L/m`, 128, 75);
+                ctx.fillStyle = "#94a3b8";
+                ctx.fillText(`${press.toFixed(1)} PSI`, 128, 105);
+
+                data.texture.needsUpdate = true;
+            });
+
+            // Update DOM
+            elTotalFlow.innerText = (totalFlow).toFixed(0);
+            elPressure.innerText = (totalPressure / sensors.length).toFixed(1);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            particles.forEach(p => {
+                const positions = p.geometry.attributes.position.array;
+                const speeds = p.userData.speeds;
+                const start = p.userData.start;
+                const end = p.userData.end;
+
+                for(let i=0; i<speeds.length; i++) {
+                    const idx = i*3;
+                    const dir = new THREE.Vector3().subVectors(end, start).normalize();
+                    positions[idx] += dir.x * speeds[i];
+                    positions[idx+1] += dir.y * speeds[i];
+                    positions[idx+2] += dir.z * speeds[i];
+
+                    const cur = new THREE.Vector3(positions[idx], positions[idx+1], positions[idx+2]);
+                    if (cur.distanceTo(start) > start.distanceTo(end)) {
+                        positions[idx] = start.x; positions[idx+1] = start.y; positions[idx+2] = start.z;
+                    }
+                }
+                p.geometry.attributes.position.needsUpdate = true;
+            });
+
+            if (Date.now() % 15 === 0) updateData();
+            composer.render();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
