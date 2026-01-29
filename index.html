@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AquaSense: Smart Water Monitoring Visualization</title>
+    <title>AquaCommerce: Smart Water Monitoring Visualization</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; color: #1e293b; }
         
         /* Full Screen Canvas */
         #canvas-container { 
@@ -18,7 +18,7 @@
             z-index: 1;
         }
         
-        /* Dashboard Overlay - Compact HUD style */
+        /* Dashboard Overlay */
         #dashboard-container {
             position: absolute;
             bottom: 20px;
@@ -27,9 +27,9 @@
             width: 90%;
             max-width: 1200px;
             height: auto;
-            background: rgba(15, 23, 42, 0.85);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.1);
             border-radius: 20px;
             display: flex;
             align-items: center;
@@ -37,7 +37,7 @@
             padding: 15px 30px;
             box-sizing: border-box;
             z-index: 10;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         }
 
         /* Branding */
@@ -45,13 +45,13 @@
             display: flex; 
             flex-direction: column; 
             min-width: 150px;
-            border-right: 1px solid rgba(255,255,255,0.1);
+            border-right: 1px solid rgba(0,0,0,0.08);
             padding-right: 20px;
             margin-right: 20px;
         }
 
-        h1 { font-size: 18px; margin: 0 0 4px 0; color: #38bdf8; display: flex; align-items: center; gap: 8px; font-weight: 700; }
-        h2 { font-size: 11px; margin: 0; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        h1 { font-size: 18px; margin: 0 0 4px 0; color: #0284c7; display: flex; align-items: center; gap: 8px; font-weight: 700; }
+        h2 { font-size: 11px; margin: 0; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
 
         /* Metrics Row */
         .metrics-section {
@@ -69,8 +69,8 @@
             padding: 0 15px;
         }
 
-        .metric-value { font-size: 24px; font-weight: 700; color: white; line-height: 1.2; }
-        .metric-label { font-size: 11px; color: #94a3b8; font-weight: 500; }
+        .metric-value { font-size: 24px; font-weight: 700; color: #0f172a; line-height: 1.2; }
+        .metric-label { font-size: 11px; color: #64748b; font-weight: 600; }
 
         /* Controls */
         .controls-section {
@@ -78,7 +78,7 @@
             align-items: center;
             gap: 15px;
             padding-left: 20px;
-            border-left: 1px solid rgba(255,255,255,0.1);
+            border-left: 1px solid rgba(0,0,0,0.08);
             margin-left: 20px;
         }
 
@@ -87,17 +87,17 @@
             border-radius: 20px;
             font-size: 11px;
             font-weight: 700;
-            background: rgba(34, 197, 94, 0.2);
-            color: #4ade80;
-            border: 1px solid rgba(34, 197, 94, 0.3);
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
             white-space: nowrap;
         }
 
-        .status-badge.alert { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+        .status-badge.alert { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
 
         button {
-            background: #38bdf8;
-            color: #0f172a;
+            background: #0ea5e9;
+            color: white;
             border: none;
             padding: 10px 20px;
             border-radius: 20px;
@@ -106,29 +106,31 @@
             cursor: pointer;
             transition: all 0.2s;
             white-space: nowrap;
+            box-shadow: 0 4px 6px rgba(14, 165, 233, 0.2);
         }
 
-        button:hover { background: #7dd3fc; transform: translateY(-1px); }
-        button.active { background: #ef4444; color: white; }
+        button:hover { background: #0284c7; transform: translateY(-1px); }
+        button.active { background: #ef4444; color: white; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); }
 
         /* Floating Legend - Top Left */
         .legend {
             position: absolute;
             top: 30px;
             left: 30px;
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(255, 255, 255, 0.95);
             padding: 15px;
             border-radius: 12px;
             font-size: 12px;
-            color: #cbd5e1;
+            color: #475569;
             pointer-events: none;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0,0,0,0.1);
             z-index: 5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
         .legend-item:last-child { margin-bottom: 0; }
-        .dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
         
         .loading {
             position: absolute;
@@ -136,7 +138,7 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 24px;
-            color: #38bdf8;
+            color: #0ea5e9;
             animation: pulse 1.5s infinite;
             z-index: 20;
             pointer-events: none;
@@ -161,10 +163,10 @@
     <!-- 3D Canvas Area -->
     <div id="canvas-container">
         <div class="legend">
-            <div class="legend-item"><div class="dot" style="background: #38bdf8; color: #38bdf8;"></div> Processing Lines</div>
-            <div class="legend-item"><div class="dot" style="background: #fb923c; color: #fb923c;"></div> AquaSense Nodes</div>
-            <div class="legend-item"><div class="dot" style="background: #ef4444; color: #ef4444;"></div> Alert/Leak Zones</div>
-            <div class="legend-item"><div class="dot" style="background: #64748b; color: #64748b;"></div> Storage Tanks</div>
+            <div class="legend-item"><div class="dot" style="background: #2563eb;"></div> Industrial Piping (Blue)</div>
+            <div class="legend-item"><div class="dot" style="background: #0ea5e9;"></div> Water Flow</div>
+            <div class="legend-item"><div class="dot" style="background: #f97316;"></div> AquaSense Nodes</div>
+            <div class="legend-item"><div class="dot" style="background: #ef4444;"></div> Alert/Leak Zones</div>
         </div>
     </div>
 
@@ -175,7 +177,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
                 </svg>
-                AquaSense
+                AquaCommerce
             </h1>
             <h2>Sector 7 Distribution</h2>
         </div>
@@ -185,17 +187,17 @@
                 <div class="metric-value" id="total-flow">0</div>
                 <div class="metric-label">Net Flow (L/min)</div>
             </div>
-            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 1px; height: 30px; background: rgba(0,0,0,0.1);"></div>
             <div class="metric-card">
                 <div class="metric-value" id="system-pressure">0</div>
                 <div class="metric-label">Avg Pressure (PSI)</div>
             </div>
-            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 1px; height: 30px; background: rgba(0,0,0,0.1);"></div>
             <div class="metric-card">
                 <div class="metric-value" id="efficiency-score">98%</div>
                 <div class="metric-label">Efficiency</div>
             </div>
-            <div style="width: 1px; height: 30px; background: rgba(255,255,255,0.1);"></div>
+            <div style="width: 1px; height: 30px; background: rgba(0,0,0,0.1);"></div>
             <div class="metric-card">
                 <div class="metric-value" id="savings-est">$4.2k</div>
                 <div class="metric-label">Mo. Savings</div>
@@ -215,14 +217,15 @@
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        // --- Configuration ---
+        // --- Configuration (High Visibility Blue) ---
         const CONFIG = {
-            pipeColor: 0x1e293b,
-            tankColor: 0x334155,
-            sensorColor: 0xfb923c,
-            alertColor: 0xef4444,
-            floorColor: 0x0f172a,
-            gridColor: 0x1e293b
+            pipeColor: 0x1d4ed8, // Darker, richer Blue for contrast
+            tankColor: 0x475569, // Slate
+            sensorColor: 0xf97316, // Orange
+            alertColor: 0xef4444, // Red
+            floorColor: 0xffffff, // White
+            gridColor: 0xcbd5e1, // Slightly darker grid for visibility
+            fogColor: 0xf1f5f9  // Match bg
         };
 
         let scene, camera, renderer, controls, composer;
@@ -246,10 +249,12 @@
 
             // Scene Setup
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x020617);
-            scene.fog = new THREE.FogExp2(0x020617, 0.012);
+            scene.background = new THREE.Color(0xf1f5f9); 
+            // DRASTICALLY REDUCED FOG (Was 0.012 -> Now 0.002)
+            // This prevents the "whiteout" effect at distance
+            scene.fog = new THREE.FogExp2(CONFIG.fogColor, 0.002);
 
-            // Camera - Positioned higher and angled down to avoid dashboard overlap
+            // Camera
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 60, 60); 
             camera.lookAt(0, 0, 0);
@@ -259,6 +264,9 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+            renderer.toneMappingExposure = 1.2; // Slightly higher exposure for brightness, but controlled
             canvasContainer.appendChild(renderer.domElement);
 
             // Controls
@@ -268,30 +276,45 @@
             controls.maxPolarAngle = Math.PI / 2.1; 
             controls.minDistance = 30;
             controls.maxDistance = 150;
-            // Shift target slightly up so model is centered in the "viewable" area above dashboard
             controls.target.set(0, 5, 0); 
 
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            // Lights - NORMALIZED FOR VISIBILITY
+            // Removed the extreme intensities that were washing out colors
+            
+            // 1. Ambient Light (Moderate base)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-            dirLight.position.set(-30, 80, 40);
+            // 2. Main Directional Light (Sun)
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); // Reduced from 4.0
+            dirLight.position.set(-50, 80, 50);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048;
             dirLight.shadow.mapSize.height = 2048;
-            dirLight.shadow.camera.left = -60;
-            dirLight.shadow.camera.right = 60;
-            dirLight.shadow.camera.top = 60;
-            dirLight.shadow.camera.bottom = -60;
+            dirLight.shadow.camera.left = -70;
+            dirLight.shadow.camera.right = 70;
+            dirLight.shadow.camera.top = 70;
+            dirLight.shadow.camera.bottom = -70;
+            dirLight.shadow.bias = -0.0005;
+            dirLight.shadow.radius = 2; 
             scene.add(dirLight);
+            
+            // 3. Rim Light (Backlight)
+            const rimLight = new THREE.DirectionalLight(0xe2e8f0, 0.8); // Reduced from 6.0
+            rimLight.position.set(20, 20, -50); 
+            scene.add(rimLight);
+
+            // 4. Fill Light
+            const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.5); // Reduced from 3.0
+            fillLight.position.set(50, 0, 50);
+            scene.add(fillLight);
 
             // Post-Processing
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0;
+            bloomPass.threshold = 0.85; // Only bloom very bright things (lights), not pipes
             bloomPass.strength = 0.3;
-            bloomPass.radius = 0;
+            bloomPass.radius = 0.2;
 
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
@@ -308,9 +331,9 @@
 
         function createEnvironment() {
             // Floor Grid
-            const gridHelper = new THREE.GridHelper(200, 100, CONFIG.alertColor, CONFIG.gridColor);
+            const gridHelper = new THREE.GridHelper(200, 100, 0x94a3b8, CONFIG.gridColor);
             gridHelper.position.y = -0.01;
-            gridHelper.material.opacity = 0.1;
+            gridHelper.material.opacity = 0.6; // Increased visibility
             gridHelper.material.transparent = true;
             scene.add(gridHelper);
 
@@ -319,7 +342,7 @@
             const planeMaterial = new THREE.MeshStandardMaterial({ 
                 color: CONFIG.floorColor, 
                 roughness: 0.8,
-                metalness: 0.1
+                metalness: 0.05
             });
             const plane = new THREE.Mesh(planeGeometry, planeMaterial);
             plane.rotation.x = -Math.PI / 2;
@@ -328,15 +351,16 @@
         }
 
         // Helper to draw a single pipe segment
-        function addPipe(start, end, diameter = 0.6) {
+        function addPipe(start, end, diameter = 1.8) { 
             const material = new THREE.MeshStandardMaterial({ 
                 color: CONFIG.pipeColor, 
-                roughness: 0.3,
-                metalness: 0.8
+                roughness: 0.5, // Matte finish to reflect color, not light
+                metalness: 0.1, // Low metalness to prevent washing out
+                emissive: 0x000000, // No emission
             });
             
             const distance = start.distanceTo(end);
-            const geometry = new THREE.CylinderGeometry(diameter, diameter, distance, 12);
+            const geometry = new THREE.CylinderGeometry(diameter, diameter, distance, 32);
             geometry.translate(0, distance / 2, 0);
             geometry.rotateX(Math.PI / 2);
             
@@ -350,7 +374,7 @@
             scene.add(pipe);
 
             // Joints
-            const jointGeo = new THREE.SphereGeometry(diameter * 1.3, 12, 12);
+            const jointGeo = new THREE.SphereGeometry(diameter * 1.2, 32, 16);
             const joint = new THREE.Mesh(jointGeo, material);
             joint.position.copy(start);
             scene.add(joint);
@@ -363,8 +387,12 @@
         }
 
         function createTank(position, height, radius, labelText) {
-            const geo = new THREE.CylinderGeometry(radius, radius, height, 32);
-            const mat = new THREE.MeshStandardMaterial({ color: CONFIG.tankColor, roughness: 0.4, metalness: 0.6 });
+            const geo = new THREE.CylinderGeometry(radius, radius, height, 48);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: CONFIG.tankColor, 
+                roughness: 0.4, 
+                metalness: 0.5 
+            });
             const tank = new THREE.Mesh(geo, mat);
             tank.position.copy(position);
             tank.position.y = height / 2;
@@ -377,12 +405,9 @@
             const ctx = canvas.getContext('2d');
             canvas.width = 512; canvas.height = 128;
             
-            // Clean text rendering
             ctx.font = "bold 40px 'Segoe UI', Arial"; 
-            ctx.fillStyle = "#38bdf8"; 
+            ctx.fillStyle = "#1e293b"; // Dark text
             ctx.textAlign = "center";
-            ctx.shadowColor="black";
-            ctx.shadowBlur=10;
             ctx.fillText(labelText, 256, 80);
             
             const tex = new THREE.CanvasTexture(canvas);
@@ -402,14 +427,14 @@
             // 2. MAIN FEED
             const feedStart = new THREE.Vector3(-45, 2, 0);
             const feedEnd = new THREE.Vector3(-25, 2, 0);
-            addPipe(feedStart, feedEnd, 0.8);
+            addPipe(feedStart, feedEnd, 2.5); // Extra thick feed
             createFlowParticles(feedStart, feedEnd);
             createSensor(new THREE.Vector3(-35, 2, 0), "MAIN-01"); 
 
             // 3. DISTRIBUTION MANIFOLD
             const manifoldTop = new THREE.Vector3(-25, 2, -18);
             const manifoldBot = new THREE.Vector3(-25, 2, 18);
-            addPipe(manifoldTop, manifoldBot, 1.0);
+            addPipe(manifoldTop, manifoldBot, 2.5);
 
             // 4. PROCESSING LINES (3 Parallel Lines)
             const zPositions = [-18, 0, 18];
@@ -421,12 +446,16 @@
                 const mid2 = new THREE.Vector3(10, 2, z);  
                 const end = new THREE.Vector3(25, 2, z);
 
-                addPipe(start, end, 0.6);
+                addPipe(start, end, 1.8); // Standard thick pipe
                 createFlowParticles(start, end);
 
                 // Processing Unit
                 const machineGeo = new THREE.BoxGeometry(6, 4, 4);
-                const machineMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.2, metalness: 0.8 });
+                const machineMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x64748b, 
+                    roughness: 0.4, 
+                    metalness: 0.6 
+                }); 
                 const machine = new THREE.Mesh(machineGeo, machineMat);
                 machine.position.set(0, 2, z);
                 machine.castShadow = true;
@@ -439,12 +468,12 @@
             // 5. COLLECTION MANIFOLD
             const colTop = new THREE.Vector3(25, 2, -18);
             const colBot = new THREE.Vector3(25, 2, 18);
-            addPipe(colTop, colBot, 1.0);
+            addPipe(colTop, colBot, 2.5);
 
             // 6. OUTLET FEED
             const outStart = new THREE.Vector3(25, 2, 0);
             const outEnd = new THREE.Vector3(45, 2, 0);
-            addPipe(outStart, outEnd, 0.8);
+            addPipe(outStart, outEnd, 2.5);
             createFlowParticles(outStart, outEnd);
             createSensor(new THREE.Vector3(35, 2, 0), "OUT-FINAL");
 
@@ -459,24 +488,24 @@
 
             // Sensor Body
             const body = new THREE.Mesh(
-                new THREE.BoxGeometry(1.2, 0.8, 0.8),
+                new THREE.BoxGeometry(1.5, 1.0, 1.0),
                 new THREE.MeshStandardMaterial({ color: CONFIG.sensorColor, roughness: 0.4 })
             );
-            body.position.y = 1;
+            body.position.y = 1.5; // Adjusted for thicker pipes
             body.castShadow = true;
             group.add(body);
 
             // Status Light
             const statusLight = new THREE.Mesh(
-                new THREE.SphereGeometry(0.25),
+                new THREE.SphereGeometry(0.3),
                 new THREE.MeshBasicMaterial({ color: 0x22c55e })
             );
-            statusLight.position.set(0, 1.5, 0);
+            statusLight.position.set(0, 2.2, 0);
             group.add(statusLight);
             
             // Point light for status glow
             const glow = new THREE.PointLight(0x22c55e, 1, 4);
-            glow.position.set(0, 2, 0);
+            glow.position.set(0, 2.5, 0);
             group.add(glow);
 
             // 3D Floating Label
@@ -484,12 +513,7 @@
             const ctx = canvas.getContext('2d');
             canvas.width = 256; canvas.height = 128;
             
-            // Initial Draw
-            ctx.fillStyle = "rgba(0,0,0,0.6)"; 
-            ctx.strokeStyle = "#38bdf8"; 
-            ctx.lineWidth=2;
-            
-            // Helper to draw rounded rect
+            // Draw Box - White background
             function roundRect(ctx, x, y, w, h, r) {
                 if (w < 2 * r) r = w / 2;
                 if (h < 2 * r) r = h / 2;
@@ -502,16 +526,19 @@
                 ctx.closePath();
             }
 
+            ctx.fillStyle = "rgba(255, 255, 255, 0.95)"; 
+            ctx.strokeStyle = "#e2e8f0"; 
+            ctx.lineWidth=2;
             roundRect(ctx, 5, 5, 246, 118, 10);
             ctx.fill();
             ctx.stroke();
 
-            ctx.font = "bold 24px Arial"; ctx.fillStyle = "white"; ctx.textAlign = "center";
+            ctx.font = "bold 24px Arial"; ctx.fillStyle = "#0f172a"; ctx.textAlign = "center"; 
             ctx.fillText(label, 128, 40);
             
             const texture = new THREE.CanvasTexture(canvas);
             const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
-            sprite.position.y = 4;
+            sprite.position.y = 5;
             sprite.scale.set(3, 1.5, 1);
             group.add(sprite);
 
@@ -546,8 +573,10 @@
 
             particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             const particleMat = new THREE.PointsMaterial({
-                color: 0x38bdf8, size: 0.25, transparent: true, opacity: 0.8,
-                blending: THREE.AdditiveBlending
+                color: 0x0ea5e9, 
+                size: 0.4, 
+                transparent: true, 
+                opacity: 0.9,
             });
 
             const points = new THREE.Points(particleGeo, particleMat);
@@ -566,17 +595,16 @@
                 elStatus.innerHTML = "CRITICAL ALERT";
                 elStatus.className = "status-badge alert";
                 elEfficiency.innerText = "64%";
-                elEfficiency.style.color = "#f87171";
+                elEfficiency.style.color = "#dc2626";
 
                 const targetSensor = sensors[2]; // Middle Line B
                 
                 targetSensor.userData.statusLight.material.color.setHex(CONFIG.alertColor);
                 targetSensor.userData.glow.color.setHex(CONFIG.alertColor);
-                targetSensor.userData.sprite.material.color.setHex(0xffaaaa);
                 
-                // Highlight Pipe
+                // Highlight Pipe Red
                 if(pipes[3]) pipes[3].material = new THREE.MeshStandardMaterial({
-                    color: 0xef4444, roughness: 0.3, emissive: 0x550000
+                    color: 0xef4444, roughness: 0.3, emissive: 0x991b1b, metalness: 0.1
                 });
 
             } else {
@@ -585,15 +613,19 @@
                 elStatus.innerHTML = "SYSTEM OPTIMAL";
                 elStatus.className = "status-badge";
                 elEfficiency.innerText = "98%";
-                elEfficiency.style.color = "white";
+                elEfficiency.style.color = "#1e293b";
 
                 sensors.forEach(s => {
                     s.userData.statusLight.material.color.setHex(0x22c55e);
                     s.userData.glow.color.setHex(0x22c55e);
-                    s.userData.sprite.material.color.setHex(0xffffff);
                 });
 
-                const defMat = new THREE.MeshStandardMaterial({ color: CONFIG.pipeColor, roughness: 0.3, metalness: 0.8 });
+                const defMat = new THREE.MeshStandardMaterial({ 
+                    color: CONFIG.pipeColor, 
+                    roughness: 0.5, 
+                    metalness: 0.1,
+                    emissive: 0x000000
+                });
                 pipes.forEach(p => p.material = defMat);
             }
         }
@@ -620,11 +652,11 @@
                 
                 // Red background if alert
                 if (isLeakActive && data.id === "LN-B-S") {
-                    ctx.fillStyle = "rgba(220, 20, 20, 0.85)";
-                    ctx.strokeStyle = "#ffaaaa";
+                    ctx.fillStyle = "rgba(254, 226, 226, 0.95)"; 
+                    ctx.strokeStyle = "#ef4444";
                 } else {
-                    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-                    ctx.strokeStyle = "#38bdf8";
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.95)"; 
+                    ctx.strokeStyle = "#e2e8f0";
                 }
                 
                 ctx.clearRect(0,0,256,128);
@@ -646,12 +678,14 @@
                 ctx.fill();
                 ctx.stroke();
 
-                ctx.font = "bold 24px Arial"; ctx.fillStyle = "white"; ctx.textAlign = "center";
+                ctx.font = "bold 24px Arial"; 
+                ctx.fillStyle = isLeakActive && data.id === "LN-B-S" ? "#b91c1c" : "#0f172a"; 
+                ctx.textAlign = "center";
                 ctx.fillText(data.id, 128, 35);
                 
-                ctx.font = "24px monospace"; ctx.fillStyle = "#38bdf8";
+                ctx.font = "24px monospace"; ctx.fillStyle = "#0ea5e9";
                 ctx.fillText(`${flow.toFixed(1)} L/m`, 128, 75);
-                ctx.fillStyle = "#94a3b8";
+                ctx.fillStyle = "#64748b";
                 ctx.fillText(`${press.toFixed(1)} PSI`, 128, 105);
 
                 data.texture.needsUpdate = true;
