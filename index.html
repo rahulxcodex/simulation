@@ -164,7 +164,7 @@
     <div id="canvas-container">
         <div class="legend">
             <div class="legend-item"><div class="dot" style="background: #2563eb;"></div> Industrial Piping (Blue)</div>
-            <div class="legend-item"><div class="dot" style="background: #0ea5e9;"></div> Water Flow</div>
+            <div class="legend-item"><div class="dot" style="background: #60a5fa;"></div> Water Flow Direction</div>
             <div class="legend-item"><div class="dot" style="background: #f97316;"></div> AquaSense Nodes</div>
             <div class="legend-item"><div class="dot" style="background: #ef4444;"></div> Alert/Leak Zones</div>
         </div>
@@ -234,6 +234,11 @@
         let particles = [];
         let isLeakActive = false;
         
+        // Leak System Vars
+        let leakSystem; 
+        let leakPosition = new THREE.Vector3(0,0,0);
+        let arrowTexture;
+        
         // DOM Elements
         const elTotalFlow = document.getElementById('total-flow');
         const elPressure = document.getElementById('system-pressure');
@@ -247,11 +252,12 @@
         function init() {
             document.getElementById('loading').style.display = 'none';
 
+            // Generate Arrow Texture for Flow
+            arrowTexture = createArrowTexture();
+
             // Scene Setup
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0xf1f5f9); 
-            // DRASTICALLY REDUCED FOG (Was 0.012 -> Now 0.002)
-            // This prevents the "whiteout" effect at distance
             scene.fog = new THREE.FogExp2(CONFIG.fogColor, 0.002);
 
             // Camera
@@ -266,7 +272,7 @@
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
             renderer.toneMapping = THREE.ACESFilmicToneMapping; 
-            renderer.toneMappingExposure = 1.2; // Slightly higher exposure for brightness, but controlled
+            renderer.toneMappingExposure = 1.2;
             canvasContainer.appendChild(renderer.domElement);
 
             // Controls
@@ -278,15 +284,11 @@
             controls.maxDistance = 150;
             controls.target.set(0, 5, 0); 
 
-            // Lights - NORMALIZED FOR VISIBILITY
-            // Removed the extreme intensities that were washing out colors
-            
-            // 1. Ambient Light (Moderate base)
+            // Lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
             scene.add(ambientLight);
 
-            // 2. Main Directional Light (Sun)
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); // Reduced from 4.0
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); 
             dirLight.position.set(-50, 80, 50);
             dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 2048;
@@ -299,20 +301,18 @@
             dirLight.shadow.radius = 2; 
             scene.add(dirLight);
             
-            // 3. Rim Light (Backlight)
-            const rimLight = new THREE.DirectionalLight(0xe2e8f0, 0.8); // Reduced from 6.0
+            const rimLight = new THREE.DirectionalLight(0xe2e8f0, 0.8); 
             rimLight.position.set(20, 20, -50); 
             scene.add(rimLight);
 
-            // 4. Fill Light
-            const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.5); // Reduced from 3.0
+            const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.5); 
             fillLight.position.set(50, 0, 50);
             scene.add(fillLight);
 
             // Post-Processing
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-            bloomPass.threshold = 0.85; // Only bloom very bright things (lights), not pipes
+            bloomPass.threshold = 0.85; 
             bloomPass.strength = 0.3;
             bloomPass.radius = 0.2;
 
@@ -324,16 +324,101 @@
             createEnvironment();
             createFullFacility();
             
+            // Initialize Leak System (Hidden initially)
+            createLeakSystem();
+
             // Event Listeners
             window.addEventListener('resize', onWindowResize);
             document.getElementById('toggle-leak').addEventListener('click', toggleLeak);
+        }
+
+        function createArrowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            // Draw Arrow >
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(10, 10);
+            ctx.lineTo(54, 32);
+            ctx.lineTo(10, 54);
+            ctx.lineTo(20, 32);
+            ctx.fill();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createLeakSystem() {
+            // Create a particle system for the spray
+            const geometry = new THREE.BufferGeometry();
+            const count = 1000;
+            const positions = new Float32Array(count * 3);
+            const velocities = new Float32Array(count * 3);
+            
+            for(let i=0; i<count; i++) {
+                positions[i*3] = leakPosition.x;
+                positions[i*3+1] = leakPosition.y;
+                positions[i*3+2] = leakPosition.z;
+                
+                // Random velocities for "Spray" effect
+                velocities[i*3] = (Math.random() - 0.5) * 1.5; // X spread
+                velocities[i*3+1] = Math.random() * 2 + 1;    // Upward initial burst
+                velocities[i*3+2] = (Math.random() - 0.5) * 1.5; // Z spread
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0xa5f3fc, // Light Cyan water
+                size: 0.3,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            leakSystem = new THREE.Points(geometry, material);
+            leakSystem.visible = false; // Start hidden
+            scene.add(leakSystem);
+        }
+
+        function updateLeakParticles() {
+            if (!isLeakActive || !leakSystem) return;
+            
+            const positions = leakSystem.geometry.attributes.position.array;
+            const velocities = leakSystem.geometry.attributes.velocity.array;
+            
+            for(let i=0; i<1000; i++) {
+                const idx = i*3;
+                
+                // Update position
+                positions[idx] += velocities[idx] * 0.1;
+                positions[idx+1] += velocities[idx+1] * 0.1;
+                positions[idx+2] += velocities[idx+2] * 0.1;
+
+                // Gravity
+                velocities[idx+1] -= 0.15; // Gravity pull
+
+                // Reset if hit floor or too low
+                if (positions[idx+1] < 0) {
+                    // Respawn at source
+                    positions[idx] = leakPosition.x;
+                    positions[idx+1] = leakPosition.y;
+                    positions[idx+2] = leakPosition.z;
+                    
+                    // Reset velocity
+                    velocities[idx] = (Math.random() - 0.5) * 0.8;
+                    velocities[idx+1] = Math.random() * 3 + 2; // Initial burst up
+                    velocities[idx+2] = (Math.random() - 0.5) * 2.0; // Shoot outwards
+                }
+            }
+            leakSystem.geometry.attributes.position.needsUpdate = true;
         }
 
         function createEnvironment() {
             // Floor Grid
             const gridHelper = new THREE.GridHelper(200, 100, 0x94a3b8, CONFIG.gridColor);
             gridHelper.position.y = -0.01;
-            gridHelper.material.opacity = 0.6; // Increased visibility
+            gridHelper.material.opacity = 0.6; 
             gridHelper.material.transparent = true;
             scene.add(gridHelper);
 
@@ -354,9 +439,9 @@
         function addPipe(start, end, diameter = 1.8) { 
             const material = new THREE.MeshStandardMaterial({ 
                 color: CONFIG.pipeColor, 
-                roughness: 0.5, // Matte finish to reflect color, not light
-                metalness: 0.1, // Low metalness to prevent washing out
-                emissive: 0x000000, // No emission
+                roughness: 0.5, 
+                metalness: 0.1, 
+                emissive: 0x000000, 
             });
             
             const distance = start.distanceTo(end);
@@ -463,6 +548,12 @@
 
                 // Sensor after machine
                 createSensor(new THREE.Vector3(15, 2, z), `${lineNames[index]}-S`);
+
+                // Capture Leak Position for Line B (Index 1)
+                if (index === 1) {
+                    // Set leak pos near the processing unit of middle line
+                    leakPosition = new THREE.Vector3(5, 2, z); 
+                }
             });
 
             // 5. COLLECTION MANIFOLD
@@ -559,7 +650,7 @@
         }
 
         function createFlowParticles(start, end) {
-            const count = 40;
+            const count = 30; // Fewer, but larger and more distinct particles
             const particleGeo = new THREE.BufferGeometry();
             const positions = new Float32Array(count * 3);
             const speeds = [];
@@ -567,16 +658,20 @@
             for(let i=0; i<count; i++) {
                 const alpha = Math.random();
                 const pos = new THREE.Vector3().lerpVectors(start, end, alpha);
-                positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
-                speeds.push(0.05 + Math.random() * 0.15);
+                positions[i*3] = pos.x; positions[i*3+1] = pos.y + 1.2; // Float above pipe slightly
+                positions[i*3+2] = pos.z;
+                speeds.push(0.08 + Math.random() * 0.05);
             }
 
             particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
             const particleMat = new THREE.PointsMaterial({
-                color: 0x0ea5e9, 
-                size: 0.4, 
+                map: arrowTexture,
+                color: 0x60a5fa, // Bright Lighter Blue
+                size: 1.5, // Larger size for visibility
                 transparent: true, 
                 opacity: 0.9,
+                alphaTest: 0.1
             });
 
             const points = new THREE.Points(particleGeo, particleMat);
@@ -602,6 +697,9 @@
                 targetSensor.userData.statusLight.material.color.setHex(CONFIG.alertColor);
                 targetSensor.userData.glow.color.setHex(CONFIG.alertColor);
                 
+                // Enable Visual Leak
+                if(leakSystem) leakSystem.visible = true;
+
                 // Highlight Pipe Red
                 if(pipes[3]) pipes[3].material = new THREE.MeshStandardMaterial({
                     color: 0xef4444, roughness: 0.3, emissive: 0x991b1b, metalness: 0.1
@@ -619,6 +717,9 @@
                     s.userData.statusLight.material.color.setHex(0x22c55e);
                     s.userData.glow.color.setHex(0x22c55e);
                 });
+
+                // Disable Visual Leak
+                if(leakSystem) leakSystem.visible = false;
 
                 const defMat = new THREE.MeshStandardMaterial({ 
                     color: CONFIG.pipeColor, 
@@ -699,7 +800,11 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+            
+            // Update Leak Particles
+            updateLeakParticles();
 
+            // Update Flow Arrows
             particles.forEach(p => {
                 const positions = p.geometry.attributes.position.array;
                 const speeds = p.userData.speeds;
@@ -709,13 +814,21 @@
                 for(let i=0; i<speeds.length; i++) {
                     const idx = i*3;
                     const dir = new THREE.Vector3().subVectors(end, start).normalize();
+                    
+                    // Simple linear movement
                     positions[idx] += dir.x * speeds[i];
                     positions[idx+1] += dir.y * speeds[i];
                     positions[idx+2] += dir.z * speeds[i];
 
                     const cur = new THREE.Vector3(positions[idx], positions[idx+1], positions[idx+2]);
+                    
+                    // Check distance relative to start to reset
+                    // Just reset if it travels further than the total distance
                     if (cur.distanceTo(start) > start.distanceTo(end)) {
-                        positions[idx] = start.x; positions[idx+1] = start.y; positions[idx+2] = start.z;
+                        positions[idx] = start.x; 
+                        // Keep Y offset relative to start's Y (start.y + 1.2 is implicit if flat)
+                        positions[idx+1] = start.y + 1.2; 
+                        positions[idx+2] = start.z;
                     }
                 }
                 p.geometry.attributes.position.needsUpdate = true;
