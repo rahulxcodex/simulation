@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AquaCommerce: Smart Water Monitoring Visualization</title>
+    <title>AquaSense: Smart Water Monitoring Visualization</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; color: #1e293b; }
         
@@ -177,7 +177,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
                 </svg>
-                AquaCommerce
+                AquaSense
             </h1>
             <h2>Sector 7 Distribution</h2>
         </div>
@@ -742,7 +742,8 @@
 
                 if (isLeakActive && data.id === "LN-B-S") {
                     press -= 35; 
-                    flow += 40; 
+                    // Simulate downstream loss: water escaping means less water reaches downstream sensor
+                    flow = Math.max(0, flow - 100); 
                 }
 
                 totalFlow += flow;
